@@ -1,0 +1,16 @@
+[package]
+name = "drcov2lcov"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.71"
+byteorder = "1.4.3"
+clap = { version = "4.3.5", features = ["derive"] }
+lazy_static = "1.4.0"
+log = "0.4.20"
+regex = "1.8.4"
+roaring = "0.10.2"
+simple_logger = "4.2.0"

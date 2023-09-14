@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["George Liontos <georgeliontos98@gmail.com>"]
 license = "GPL-2"
+repository = "https://github.com/GeorgeLS/drcov2lcov"
 description = """
 Generate line coverage from drcov files
 """

@@ -1,9 +1,13 @@
 mod drcov;
+mod dwarf;
 mod util;
 
-use crate::drcov::Drcov;
+use crate::drcov::{Drcov, DrcovFilters};
+use crate::dwarf::{gather_line_info, LineInfo};
 use clap::Parser;
-use simple_logger::SimpleLogger;
+use itertools::Itertools;
+use std::collections::HashMap;
+use std::fmt::Write;
 use std::path::Path;
 
 mod constants {
@@ -22,6 +26,8 @@ struct CliOptions {
     pub input: String,
     #[clap(short, long, default_value_t = default_output_file(), help = "The path to the output file")]
     pub output: String,
+    #[clap(short, long, help = "Only include coverage for this library")]
+    pub module_filter: Option<String>,
 }
 
 impl CliOptions {
@@ -49,14 +55,46 @@ impl CliOptions {
 
         Ok(self_)
     }
+
+    pub fn get_drcov_filters(&self) -> DrcovFilters {
+        DrcovFilters {
+            module_filter: self.module_filter.clone(),
+        }
+    }
+}
+
+fn write_lcov_output(path: &str, line_info: &HashMap<String, Vec<LineInfo>>) -> anyhow::Result<()> {
+    let mut res = String::new();
+    for file in line_info.keys().sorted() {
+        let _ = writeln!(res, "SF:{file}");
+        for info in &line_info[file] {
+            let _ = writeln!(
+                res,
+                "DA:{},{}",
+                info.line,
+                if info.executed { 1 } else { 0 }
+            );
+        }
+        let _ = writeln!(res, "end_of_record");
+    }
+
+    std::fs::write(path, res)?;
+
+    Ok(())
 }
 
 fn main() -> anyhow::Result<()> {
-    SimpleLogger::new().init()?;
+    env_logger::init();
 
     let options = CliOptions::parse_and_validate()?;
 
-    let _drcov = Drcov::from_file(&options.input)?;
+    let drcov_filters = options.get_drcov_filters();
+
+    let drcov = Drcov::from_file(&options.input, drcov_filters)?;
+
+    let line_info = gather_line_info(&drcov.modules);
+
+    write_lcov_output(&options.output, &line_info)?;
 
     Ok(())
 }

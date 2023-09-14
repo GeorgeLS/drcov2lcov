@@ -186,13 +186,6 @@ pub struct Modules {
     pub table: Vec<Module>,
 }
 
-#[derive(Debug)]
-pub struct Drcov {
-    pub version: u32,
-    pub flavor: String,
-    pub modules: Modules,
-}
-
 #[repr(C)]
 #[derive(Debug)]
 pub struct BBEntry {
@@ -219,15 +212,43 @@ impl BBEntry {
     }
 }
 
+#[derive(Debug)]
+pub struct DrcovFilters {
+    pub module_filter: Option<String>,
+}
+
+impl DrcovFilters {
+    pub fn matches_module_filter(&self, input: &[u8]) -> bool {
+        match self.module_filter.as_ref() {
+            None => true,
+            Some(filter) => {
+                let filter_bytes = filter.as_bytes();
+                if filter_bytes.is_empty() {
+                    return true;
+                }
+
+                input
+                    .windows(filter_bytes.len())
+                    .any(|sub_slice| sub_slice == filter_bytes)
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Drcov {
+    pub version: u32,
+    pub flavor: String,
+    pub modules: Modules,
+}
+
 impl Drcov {
-    pub fn from_file(path: &str) -> anyhow::Result<Self> {
+    pub fn from_file(path: &str, filters: DrcovFilters) -> anyhow::Result<Self> {
         fn parse_version<'a, I: Iterator<Item = &'a [u8]>>(
             lines_iter: &mut I,
-            cursor: &mut usize,
         ) -> anyhow::Result<u32> {
             log::debug!("Parsing version number");
             let version_line = lines_iter.next().ok_or(anyhow!("Version line missing"))?;
-            *cursor += version_line.len() + 1;
 
             let cap = constants::DRCOV_VERSION_REGEX
                 .captures(version_line)
@@ -243,12 +264,10 @@ impl Drcov {
 
         fn parse_flavor<'a, I: Iterator<Item = &'a [u8]>>(
             lines_iter: &mut I,
-            cursor: &mut usize,
         ) -> anyhow::Result<String> {
             log::debug!("Parsing flavor");
 
             let flavor_line = lines_iter.next().ok_or(anyhow!("Flavor line missing"))?;
-            *cursor += flavor_line.len() + 1;
 
             let cap = constants::DRCOV_FLAVOR_REGEX
                 .captures(flavor_line)
@@ -264,12 +283,10 @@ impl Drcov {
 
         fn parse_num_basic_blocks<'a, I: Iterator<Item = &'a [u8]>>(
             lines_iter: &mut I,
-            cursor: &mut usize,
         ) -> anyhow::Result<usize> {
             let bb_header_line = lines_iter
                 .next()
                 .ok_or(anyhow!("Basic Block header line missing"))?;
-            *cursor += bb_header_line.len() + 1;
 
             let bb_cap = constants::DRCOV_BB_HEADER_REGEX
                 .captures(bb_header_line)
@@ -310,14 +327,13 @@ impl Drcov {
 
         fn parse_modules<'a, I: Iterator<Item = &'a [u8]>>(
             lines_iter: &mut I,
-            cursor: &mut usize,
+            filters: &DrcovFilters,
         ) -> anyhow::Result<Modules> {
             log::debug!("Parsing modules");
 
             let header_line = lines_iter
                 .next()
                 .ok_or(anyhow!("Modules header line missing"))?;
-            *cursor += header_line.len() + 1;
 
             let invalid_module_header_line_err =
                 "Modules header line does not match the expected format";
@@ -360,6 +376,10 @@ impl Drcov {
                     .next()
                     .ok_or(anyhow!("Invalid module table (lines missing)"))?;
 
+                if !filters.matches_module_filter(line) {
+                    continue;
+                }
+
                 let module = parser(line)?;
 
                 table.push(module);
@@ -389,16 +409,20 @@ impl Drcov {
         let mut lines_iter = contents
             .as_slice()
             .split(|b| *b == b'\n')
-            .filter(|line| !line.is_empty());
+            .filter(|line| !line.is_empty())
+            .inspect(|v| cursor += v.len() + 1);
 
-        let version = parse_version(&mut lines_iter, &mut cursor)?;
-        let flavor = parse_flavor(&mut lines_iter, &mut cursor)?;
-        let mut modules = parse_modules(&mut lines_iter, &mut cursor)?;
-        let num_bb = parse_num_basic_blocks(&mut lines_iter, &mut cursor)?;
+        let version = parse_version(&mut lines_iter)?;
+        let flavor = parse_flavor(&mut lines_iter)?;
+        let mut modules = parse_modules(&mut lines_iter, &filters)?;
+        let num_bb = parse_num_basic_blocks(&mut lines_iter)?;
+
+        log::debug!("Number of Basic Blocks: {num_bb}");
 
         drop(lines_iter);
 
         let bb_data = &contents[cursor..];
+
         parse_basic_blocks(bb_data, num_bb, &mut modules.table)?;
 
         log::debug!("Modules parsed: {:#?}", modules.table);

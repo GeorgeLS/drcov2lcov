@@ -27,6 +27,11 @@ Adding support for the above features is about 2 hours of work so these will be 
 The main purpose of this tool however has been implemented, which is to generate line coverage from `drcov` files.\
 Also, all `drcov` file version formats are supported (1-5).
 
+## Extra features vs DynamoRIO's drcov2lcov
+
+This implementation of `drcov2lcov` supports generating line coverage for executables/libraries that have been compiled with Dwarf v5 symbols (this is the default for latest compilers)\
+as well as for executables/libraries that have been compiled with compressed Dwarf data.
+
 ## Usage
 
 In order to generate line coverage from a `drcov` file you can just run
@@ -53,3 +58,4 @@ if you want to build this project from source or install directly from `crates.i
 ```bash
 cargo install drcov2lcov
 ```
+

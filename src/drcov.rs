@@ -244,7 +244,7 @@ pub struct Drcov {
 }
 
 impl Drcov {
-    pub fn from_file<P: AsRef<Path>>(path: P, filters: DrcovFilters) -> anyhow::Result<Self> {
+    pub fn from_file<P: AsRef<Path>>(path: P, filters: &DrcovFilters) -> anyhow::Result<Self> {
         fn parse_version<'a, I: Iterator<Item = &'a [u8]>>(
             lines_iter: &mut I,
         ) -> anyhow::Result<u32> {

@@ -3,7 +3,7 @@ mod dwarf;
 mod util;
 
 use crate::drcov::{Drcov, DrcovFilters};
-use crate::dwarf::{gather_line_info, LineInfo};
+use crate::dwarf::{gather_line_info, LineInfo, LineInfoFilters};
 use clap::Parser;
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
@@ -46,6 +46,16 @@ struct CliOptions {
         help = "Skip coverage for the modules that match the given regular expression"
     )]
     pub module_skip_filter: Option<String>,
+    #[clap(
+        long,
+        help = "Only include coverage for source files that match the given regular expression"
+    )]
+    pub source_filter: Option<String>,
+    #[clap(
+        long,
+        help = "Skip coverage for source files that match the given regular expression"
+    )]
+    pub source_skip_filter: Option<String>,
 }
 
 impl CliOptions {
@@ -149,6 +159,23 @@ impl CliOptions {
             module_skip_filter,
         }
     }
+
+    pub fn get_line_info_filters(&self) -> LineInfoFilters {
+        let src_filter = self
+            .source_filter
+            .clone()
+            .and_then(|filter| regex::Regex::new(&filter).ok());
+
+        let src_skip_filter = self
+            .source_skip_filter
+            .clone()
+            .and_then(|filter| regex::Regex::new(&filter).ok());
+
+        LineInfoFilters {
+            src_filter,
+            src_skip_filter,
+        }
+    }
 }
 
 fn write_lcov_output(path: &str, line_info: &HashMap<String, Vec<LineInfo>>) -> anyhow::Result<()> {
@@ -180,12 +207,14 @@ fn main() -> anyhow::Result<()> {
 
     let drcov_filters = options.get_drcov_filters();
 
+    let line_info_filters = options.get_line_info_filters();
+
     let mut line_info = HashMap::new();
 
     for input_file in input_files {
-        match Drcov::from_file(input_file.as_path(), drcov_filters.clone()) {
+        match Drcov::from_file(input_file.as_path(), &drcov_filters) {
             Ok(drcov) => {
-                let info = gather_line_info(&drcov.modules);
+                let info = gather_line_info(&drcov.modules, &line_info_filters);
                 line_info.extend(info);
             }
             Err(e) => {

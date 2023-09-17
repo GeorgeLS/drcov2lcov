@@ -12,16 +12,16 @@ Currently supported features:
 | Specify an output file to store line coverage information. Default: `<current_directory>/coverage.info`                                                         | `-output`          |
 | Filter specific modules from the `drcov` file. This allows generating line coverage for only the modules matching the given regular expression. Default: `None` | `-mod_filter`      |
 | Filter out specific modules from line coverage collection                                                                                                       | `-mod_skip_filter` |
+| Filter specific source code paths from each module for line coverage collection                                                                                 | `-src_filter`      |
+| Filter out specific source code paths from each module for line coverage collection                                                                             | `-src_skip_filter` |
 
 Unsupported features:
 
-| Feature                                                                                                                  | DynamoRIO's flag   |
-|--------------------------------------------------------------------------------------------------------------------------|--------------------|
-| Specify a test function regular expression in order to generate test coverage information in the output file             | `-test_pattern`    |
-| Filter specific source code paths from each module for line coverage collection                                          | `-src_filter`      |
-| Filter out specific source code paths from each module for line coverage collection                                      | `-src_skip_filter` |
-| Reduce the set of `drov` files from the input to a smaller set of `drcov` files containing the same coverage information | `-reduce_set`      |
-| Replace a module path with another one before gathering debug info for that module                                       | `-pathmap`         |
+| Feature                                                                                                                  | DynamoRIO's flag |
+|--------------------------------------------------------------------------------------------------------------------------|------------------|
+| Specify a test function regular expression in order to generate test coverage information in the output file             | `-test_pattern`  |
+| Reduce the set of `drov` files from the input to a smaller set of `drcov` files containing the same coverage information | `-reduce_set`    |
+| Replace a module path with another one before gathering debug info for that module                                       | `-pathmap`       |
 
 ## Extra features vs DynamoRIO's drcov2lcov
 

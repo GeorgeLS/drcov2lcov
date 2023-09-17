@@ -3,6 +3,7 @@ use gimli::{Dwarf, LineProgramHeader, LineRow, Reader, Unit};
 use itertools::Itertools;
 use object::{Object, ObjectSection, ObjectSegment, SegmentFlags};
 use ouroboros::self_referencing;
+use regex::Regex;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::os::unix::fs::MetadataExt;
@@ -145,6 +146,28 @@ fn get_module_object_with_debug_info(module: &Module) -> anyhow::Result<Option<O
     Ok(None)
 }
 
+#[derive(Debug, Clone)]
+pub struct LineInfoFilters {
+    pub src_filter: Option<Regex>,
+    pub src_skip_filter: Option<Regex>,
+}
+
+impl LineInfoFilters {
+    pub fn matches_source_filter(&self, source: Option<&String>) -> bool {
+        match self.src_filter.as_ref() {
+            None => true,
+            Some(filter) => source.is_some_and(|source| filter.is_match(&*source)),
+        }
+    }
+
+    pub fn matches_source_skip_filter(&self, source: Option<&String>) -> bool {
+        match self.src_skip_filter.as_ref() {
+            None => false,
+            Some(filter) => source.is_some_and(|source| filter.is_match(&*source)),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct LineInfo {
     pub line: u64,
@@ -190,6 +213,7 @@ fn gather_object_file_debug_info(
     module: &Module,
     object_file: &ObjectFile,
     line_table: &mut HashMap<String, Vec<LineInfo>>,
+    filters: &LineInfoFilters,
 ) -> anyhow::Result<()> {
     let object = object_file.with_object(|obj| obj);
     let load_base = object_file.load_base();
@@ -228,6 +252,12 @@ fn gather_object_file_debug_info(
             while let Some((header, row)) = rows.next_row()? {
                 program_file =
                     program_file.or_else(|| get_program_file(&dwarf, &unit, header, row));
+
+                if !filters.matches_source_filter(program_file.as_ref())
+                    || filters.matches_source_skip_filter(program_file.as_ref())
+                {
+                    continue;
+                }
 
                 let line = row.line().map(|v| v.get()).unwrap_or_default();
                 let addr = row.address() - load_base - module.segment_offset as u64;
@@ -270,7 +300,10 @@ fn coalesce_line_info(line_table: &mut HashMap<String, Vec<LineInfo>>) {
     }
 }
 
-pub fn gather_line_info(modules: &Modules) -> HashMap<String, Vec<LineInfo>> {
+pub fn gather_line_info(
+    modules: &Modules,
+    filters: &LineInfoFilters,
+) -> HashMap<String, Vec<LineInfo>> {
     let mut line_table = HashMap::new();
 
     for module in &modules.table {
@@ -282,7 +315,7 @@ pub fn gather_line_info(modules: &Modules) -> HashMap<String, Vec<LineInfo>> {
 
         match get_module_object_with_debug_info(module) {
             Ok(Some(object_file)) => {
-                match gather_object_file_debug_info(module, &object_file, &mut line_table) {
+                match gather_object_file_debug_info(module, &object_file, &mut line_table, filters) {
                     Err(err) => log::error!("An error occurred while gathering debug info for {}. Info: {}", module.path, err),
                     _ => {
                         log::info!("Gathered debug information about module {}", module.path);

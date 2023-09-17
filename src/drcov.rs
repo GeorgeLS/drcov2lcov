@@ -1,8 +1,10 @@
 use crate::util::{parse_capture_group, Hex};
 use anyhow::anyhow;
 use byteorder::{LittleEndian, ReadBytesExt};
+use regex::bytes::Regex;
 use roaring::RoaringBitmap;
 use std::io::{Cursor, Read};
+use std::path::Path;
 
 mod constants {
     use lazy_static::lazy_static;
@@ -212,25 +214,24 @@ impl BBEntry {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DrcovFilters {
-    pub module_filter: Option<String>,
+    pub module_filter: Option<Regex>,
+    pub module_skip_filter: Option<Regex>,
 }
 
 impl DrcovFilters {
     pub fn matches_module_filter(&self, input: &[u8]) -> bool {
         match self.module_filter.as_ref() {
             None => true,
-            Some(filter) => {
-                let filter_bytes = filter.as_bytes();
-                if filter_bytes.is_empty() {
-                    return true;
-                }
+            Some(filter) => filter.is_match(input),
+        }
+    }
 
-                input
-                    .windows(filter_bytes.len())
-                    .any(|sub_slice| sub_slice == filter_bytes)
-            }
+    pub fn matches_module_skip_filter(&self, input: &[u8]) -> bool {
+        match self.module_skip_filter.as_ref() {
+            None => false,
+            Some(filter) => filter.is_match(input),
         }
     }
 }
@@ -243,7 +244,7 @@ pub struct Drcov {
 }
 
 impl Drcov {
-    pub fn from_file(path: &str, filters: DrcovFilters) -> anyhow::Result<Self> {
+    pub fn from_file<P: AsRef<Path>>(path: P, filters: DrcovFilters) -> anyhow::Result<Self> {
         fn parse_version<'a, I: Iterator<Item = &'a [u8]>>(
             lines_iter: &mut I,
         ) -> anyhow::Result<u32> {
@@ -322,6 +323,7 @@ impl Drcov {
                     module.bb_bitmap.insert_range(addr_start..addr_end);
                 }
             }
+
             Ok(())
         }
 
@@ -376,7 +378,8 @@ impl Drcov {
                     .next()
                     .ok_or(anyhow!("Invalid module table (lines missing)"))?;
 
-                if !filters.matches_module_filter(line) {
+                if !filters.matches_module_filter(line) || filters.matches_module_skip_filter(line)
+                {
                     continue;
                 }
 
@@ -399,10 +402,11 @@ impl Drcov {
             }
 
             log::debug!("Modules version: {version}, Number of modules: {num_modules}");
+
             Ok(Modules { version, table })
         }
 
-        log::info!("Loading drcov file: {path}");
+        log::info!("Loading drcov file: {}", path.as_ref().display());
         let mut cursor: usize = 0;
         let contents = std::fs::read(path)?;
 

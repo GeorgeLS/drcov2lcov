@@ -1,8 +1,9 @@
+use crate::cli::{Filter, ReplacementFilter};
 use crate::util::{parse_capture_group, Hex};
 use anyhow::anyhow;
 use byteorder::{LittleEndian, ReadBytesExt};
-use regex::bytes::Regex;
 use roaring::RoaringBitmap;
+use std::borrow::Cow;
 use std::io::{Cursor, Read};
 use std::path::Path;
 
@@ -215,24 +216,39 @@ impl BBEntry {
 }
 
 #[derive(Debug, Clone)]
-pub struct DrcovFilters {
-    pub module_filter: Option<Regex>,
-    pub module_skip_filter: Option<Regex>,
+pub struct DrcovFilters<'r> {
+    pub module_filters: &'r [Filter],
+    pub module_skip_filters: &'r [Filter],
+    pub path_map_filters: &'r [ReplacementFilter],
 }
 
-impl DrcovFilters {
-    pub fn matches_module_filter(&self, input: &[u8]) -> bool {
-        match self.module_filter.as_ref() {
-            None => true,
-            Some(filter) => filter.is_match(input),
-        }
+impl DrcovFilters<'_> {
+    pub fn matches_any_module_filter(&self, input: &[u8]) -> bool {
+        self.module_filters.is_empty()
+            || self
+                .module_filters
+                .iter()
+                .any(|filter| filter.matcher.is_match(input))
     }
 
-    pub fn matches_module_skip_filter(&self, input: &[u8]) -> bool {
-        match self.module_skip_filter.as_ref() {
-            None => false,
-            Some(filter) => filter.is_match(input),
-        }
+    pub fn matches_any_module_skip_filter(&self, input: &[u8]) -> bool {
+        (!self.module_skip_filters.is_empty())
+            && self
+                .module_skip_filters
+                .iter()
+                .any(|filter| filter.matcher.is_match(input))
+    }
+
+    pub fn maybe_replace_with_path_map_filter<'d>(&'d self, input: &'d [u8]) -> Cow<[u8]> {
+        self.path_map_filters
+            .iter()
+            .find_map(|filter| {
+                filter
+                    .matcher
+                    .is_match(input)
+                    .then(|| filter.matcher.replace(input, filter.replacement.as_bytes()))
+            })
+            .unwrap_or(Cow::Borrowed(input))
     }
 }
 
@@ -376,14 +392,16 @@ impl Drcov {
             for _ in 0..num_modules {
                 let line = lines_iter
                     .next()
+                    .map(|line| filters.maybe_replace_with_path_map_filter(line))
                     .ok_or(anyhow!("Invalid module table (lines missing)"))?;
 
-                if !filters.matches_module_filter(line) || filters.matches_module_skip_filter(line)
+                if !filters.matches_any_module_filter(line.as_ref())
+                    || filters.matches_any_module_skip_filter(line.as_ref())
                 {
                     continue;
                 }
 
-                let module = parser(line)?;
+                let module = parser(line.as_ref())?;
 
                 table.push(module);
             }

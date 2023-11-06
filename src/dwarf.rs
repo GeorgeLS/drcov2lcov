@@ -1,9 +1,9 @@
+use crate::cli::Filter;
 use crate::drcov::{Module, Modules};
 use gimli::{Dwarf, LineProgramHeader, LineRow, Reader, Unit};
 use itertools::Itertools;
 use object::{Object, ObjectSection, ObjectSegment, SegmentFlags};
 use ouroboros::self_referencing;
-use regex::Regex;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::os::unix::fs::MetadataExt;
@@ -147,24 +147,30 @@ fn get_module_object_with_debug_info(module: &Module) -> anyhow::Result<Option<O
 }
 
 #[derive(Debug, Clone)]
-pub struct LineInfoFilters {
-    pub src_filter: Option<Regex>,
-    pub src_skip_filter: Option<Regex>,
+pub struct LineInfoFilters<'r> {
+    pub src_filters: &'r [Filter],
+    pub src_skip_filters: &'r [Filter],
 }
 
-impl LineInfoFilters {
-    pub fn matches_source_filter(&self, source: Option<&String>) -> bool {
-        match self.src_filter.as_ref() {
-            None => true,
-            Some(filter) => source.is_some_and(|source| filter.is_match(&*source)),
-        }
+impl LineInfoFilters<'_> {
+    pub fn matches_any_source_filter(&self, source: Option<&String>) -> bool {
+        source.is_some_and(|source| {
+            self.src_filters.is_empty()
+                || self
+                    .src_filters
+                    .iter()
+                    .any(|filter| filter.matcher.is_match(source.as_bytes()))
+        })
     }
 
-    pub fn matches_source_skip_filter(&self, source: Option<&String>) -> bool {
-        match self.src_skip_filter.as_ref() {
-            None => false,
-            Some(filter) => source.is_some_and(|source| filter.is_match(&*source)),
-        }
+    pub fn matches_any_source_skip_filter(&self, source: Option<&String>) -> bool {
+        source.is_some_and(|source| {
+            (!self.src_skip_filters.is_empty())
+                && self
+                    .src_skip_filters
+                    .iter()
+                    .any(|filter| filter.matcher.is_match(source.as_bytes()))
+        })
     }
 }
 
@@ -253,8 +259,8 @@ fn gather_object_file_debug_info(
                 program_file =
                     program_file.or_else(|| get_program_file(&dwarf, &unit, header, row));
 
-                if !filters.matches_source_filter(program_file.as_ref())
-                    || filters.matches_source_skip_filter(program_file.as_ref())
+                if !filters.matches_any_source_filter(program_file.as_ref())
+                    || filters.matches_any_source_skip_filter(program_file.as_ref())
                 {
                     continue;
                 }

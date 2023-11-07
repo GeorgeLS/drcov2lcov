@@ -43,16 +43,41 @@ fn main() -> anyhow::Result<()> {
 
     let mut line_info = HashMap::new();
 
-    for input_file in input_files {
+    let mut previous_coverages = options.reduce_set_path.is_some().then(|| Vec::new());
+    let mut reduced_input_set = options.reduce_set_path.is_some().then(|| Vec::new());
+
+    for input_file in &input_files {
         match Drcov::from_file(input_file.as_path(), &drcov_filters) {
             Ok(drcov) => {
                 let info = gather_line_info(&drcov.modules, &line_info_filters);
                 line_info.extend(info);
+
+                if options.reduce_set_path.is_some() {
+                    // Safety: We can unwrap here since we know these values have been set
+                    let previous_coverages = previous_coverages.as_mut().unwrap();
+                    let reduced_input_set = reduced_input_set.as_mut().unwrap();
+
+                    let modules_coverage = drcov.modules.get_coverage_all();
+
+                    if !previous_coverages
+                        .iter()
+                        .any(|coverage| *coverage == modules_coverage)
+                    {
+                        reduced_input_set.push(input_file.to_string_lossy().to_string());
+                        previous_coverages.push(modules_coverage);
+                    }
+                }
             }
             Err(e) => {
                 log::warn!("Could not parse '{}' as a drcov file. Skipping from line coverage analysis. Reason: {e}", input_file.display())
             }
         }
+    }
+
+    if let Some(reduce_set_path) = options.reduce_set_path {
+        // Safety: We can unwrap here since we know this value has been set
+        let reduced_input_set = reduced_input_set.unwrap();
+        std::fs::write(reduce_set_path, reduced_input_set.join("\n"))?;
     }
 
     write_lcov_output(&options.output, &line_info)?;

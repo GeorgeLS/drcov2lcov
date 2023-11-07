@@ -189,6 +189,18 @@ pub struct Modules {
     pub table: Vec<Module>,
 }
 
+impl Modules {
+    pub fn get_coverage_all(&self) -> RoaringBitmap {
+        let mut res = RoaringBitmap::new();
+
+        for module in &self.table {
+            res.extend(&module.bb_bitmap);
+        }
+
+        res
+    }
+}
+
 #[repr(C)]
 #[derive(Debug)]
 pub struct BBEntry {

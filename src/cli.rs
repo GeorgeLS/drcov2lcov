@@ -106,6 +106,12 @@ pub struct CliOptions {
         help = "Takes two values: the first specifies the library path to look for in each drcov log file and the second specifies the path to replace it with before looking for debug information for that library. You can provide this option multiple times for different mappings. Values should be separated by a colon (:)"
     )]
     pub path_map_filters: Vec<ReplacementFilter>,
+    #[clap(
+        short,
+        long,
+        help = "Reduce the set of drov files from the input to a smaller set of drcov files containing the same coverage information and store the input files into the given path"
+    )]
+    pub reduce_set_path: Option<String>,
 }
 
 impl CliOptions {

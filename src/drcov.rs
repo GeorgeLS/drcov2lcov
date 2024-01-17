@@ -21,13 +21,13 @@ mod constants {
         pub static ref DRCOV_MODULE_HEADER_REGEX: Regex =
             Regex::new(r"Module Table: version (?P<version>\d+), count (?P<count>\d+)").unwrap();
         pub static ref DRCOV_MODULE_V1_REGEX: Regex =
-            Regex::new(r"\s*(?P<id>\d+), (?P<size>\d+), (?P<path>[^\s]+)").unwrap();
+            Regex::new(r"\s*(?P<id>\d+),\s*(?P<size>\d+),\s*(?P<path>[^\s]+)").unwrap();
         pub static ref DRCOV_MODULE_V2_REGEX: Regex =
-            Regex::new(r"(?P<id>\d+), 0[xX](?P<base>[[:xdigit:]]+), 0[xX](?P<end>[[:xdigit:]]+), 0[xX](?P<entry>[[:xdigit:]]+), (?P<path>[^\s]+)")
+            Regex::new(r"\s*(?P<id>\d+),\s*0[xX](?P<base>[[:xdigit:]]+),\s*0[xX](?P<end>[[:xdigit:]]+),\s*0[xX](?P<entry>[[:xdigit:]]+),\s*(?P<path>[^\s]+)")
                 .unwrap();
-        pub static ref DRCOV_MODULE_V3_REGEX: Regex = Regex::new(r"(?P<id>\d+), (?P<containing_id>\d+), 0[xX](?P<base>[[:xdigit:]]+), 0[xX](?P<end>[[:xdigit:]]+), 0[xX](?P<entry>[[:xdigit:]]+), (?P<path>[^\s]+)").unwrap();
-        pub static ref DRCOV_MODULE_V4_REGEX: Regex = Regex::new(r"(?P<id>\d+), (?P<containing_id>\d+), 0[xX](?P<base>[[:xdigit:]]+), 0[xX](?P<end>[[:xdigit:]]+), 0[xX](?P<entry>[[:xdigit:]]+), (?P<offset>[[:xdigit:]]+), (?P<path>[^\s]+)").unwrap();
-        pub static ref DRCOV_MODULE_V5_REGEX: Regex = Regex::new(r"(?P<id>\d+), (?P<containing_id>\d+), 0[xX](?P<base>[[:xdigit:]]+), 0[xX](?P<end>[[:xdigit:]]+), 0[xX](?P<entry>[[:xdigit:]]+), (?P<offset>[[:xdigit:]]+), 0[xX](?P<preferred_base>[[:xdigit:]]+), (?P<path>[^\s]+)").unwrap();
+        pub static ref DRCOV_MODULE_V3_REGEX: Regex = Regex::new(r"\s*(?P<id>\d+),\s*(?P<containing_id>\d+),\s*0[xX](?P<base>[[:xdigit:]]+),\s*0[xX](?P<end>[[:xdigit:]]+),\s*0[xX](?P<entry>[[:xdigit:]]+),\s*(?P<path>[^\s]+)").unwrap();
+        pub static ref DRCOV_MODULE_V4_REGEX: Regex = Regex::new(r"\s*(?P<id>\d+),\s*(?P<containing_id>\d+),\s*0[xX](?P<base>[[:xdigit:]]+),\s*0[xX](?P<end>[[:xdigit:]]+),\s*0[xX](?P<entry>[[:xdigit:]]+),\s*0[xX](?P<offset>[[:xdigit:]]+),\s*(?P<path>[^\s]+)").unwrap();
+        pub static ref DRCOV_MODULE_V5_REGEX: Regex = Regex::new(r"\s*(?P<id>\d+),\s*(?P<containing_id>\d+),\s*0[xX](?P<base>[[:xdigit:]]+),\s*0[xX](?P<end>[[:xdigit:]]+),\s*0[xX](?P<entry>[[:xdigit:]]+),\s*0[xX](?P<offset>[[:xdigit:]]+),\s*0[xX](?P<preferred_base>[[:xdigit:]]+),\s*(?P<path>[^\s]+)").unwrap();
         pub static ref DRCOV_BB_HEADER_REGEX: Regex = Regex::new(r"BB Table: (?P<count>\d+) bbs").unwrap();
     }
 }

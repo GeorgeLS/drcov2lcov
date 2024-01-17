@@ -25,19 +25,17 @@ struct ObjectFile {
 
 impl ObjectFile {
     pub fn load_base(&self) -> u64 {
-        let object = self.with_object(|obj| obj);
-        let mut load_base = 0;
-        for segment in object.segments() {
-            if let SegmentFlags::Elf { p_flags } = segment.flags() {
-                if p_flags & object::elf::PT_LOAD != 0 {
-                    let (offset, _) = segment.file_range();
-                    load_base = segment.address() - offset;
-                    break;
+        self.with_object(|obj| obj)
+            .segments()
+            .filter_map(|s| {
+                if let SegmentFlags::Elf { p_flags } = s.flags() {
+                    (p_flags & object::elf::PT_LOAD != 0).then_some(s.address() - s.file_range().0)
+                } else {
+                    None
                 }
-            }
-        }
-
-        load_base
+            })
+            .min()
+            .unwrap_or_default()
     }
 }
 
@@ -265,7 +263,9 @@ fn gather_object_file_debug_info(
                     continue;
                 }
 
-                let line = row.line().map(|v| v.get()).unwrap_or_default();
+                let Some(line) = row.line().map(|v| v.get()) else {
+                    continue;
+                };
                 let addr = row.address() - load_base - module.segment_offset as u64;
 
                 if addr > u32::MAX as u64 || module.size <= addr as usize {
@@ -290,9 +290,7 @@ fn coalesce_line_info(line_table: &mut HashMap<String, Vec<LineInfo>>) {
     let mut line_map = HashMap::new();
     for info in line_table.values_mut() {
         for line_info in info.drain(..) {
-            if line_info.line != 0 {
-                *line_map.entry(line_info.line).or_default() |= line_info.executed;
-            }
+            *line_map.entry(line_info.line).or_default() |= line_info.executed;
         }
         for (line, executed) in line_map
             .iter()

@@ -250,12 +250,10 @@ fn gather_object_file_debug_info(
     while let Some(header) = units_iter.next()? {
         let unit = dwarf.unit(header)?;
         if let Some(program) = unit.line_program.clone() {
-            let mut program_file = None;
             let mut rows = program.rows();
 
             while let Some((header, row)) = rows.next_row()? {
-                program_file =
-                    program_file.or_else(|| get_program_file(&dwarf, &unit, header, row));
+                let program_file = get_program_file(&dwarf, &unit, header, row);
 
                 if !filters.matches_any_source_filter(program_file.as_ref())
                     || filters.matches_any_source_skip_filter(program_file.as_ref())

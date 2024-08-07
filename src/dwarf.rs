@@ -1,6 +1,6 @@
 use crate::cli::Filter;
 use crate::drcov::{Module, Modules};
-use gimli::{Dwarf, LineProgramHeader, LineRow, Reader, Unit};
+use gimli::{Dwarf, DwarfSections, LineProgramHeader, LineRow, Reader, Unit};
 use itertools::Itertools;
 use object::{Object, ObjectSection, ObjectSegment, SegmentFlags};
 use ouroboros::self_referencing;
@@ -237,18 +237,18 @@ fn gather_object_file_debug_info(
         }
     };
 
-    let borrow_section: &dyn for<'a> Fn(
-        &'a Cow<[u8]>,
-    ) -> gimli::EndianSlice<'a, gimli::RunTimeEndian> =
-        &|section| gimli::EndianSlice::new(section, endian);
+    let borrow_section=
+        |section| gimli::EndianSlice::new(Cow::as_ref(section), endian);
 
-    let dwarf = Dwarf::load(&load_section)?;
+    let dwarf = DwarfSections::load(&load_section)?;
     let dwarf = dwarf.borrow(&borrow_section);
 
     let mut units_iter = dwarf.units();
 
     while let Some(header) = units_iter.next()? {
         let unit = dwarf.unit(header)?;
+        let unit = unit.unit_ref(&dwarf);
+
         if let Some(program) = unit.line_program.clone() {
             let mut rows = program.rows();
 
